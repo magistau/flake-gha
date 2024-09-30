@@ -1,6 +1,7 @@
 {
   description = "A simple flake using GitHub Actions and Cachix";
   inputs = {
+    # NOTE: You may want to add a nixpkgs input instead of relying on the registry
     flake-parts = {
       type = "github";
       owner = "hercules-ci";
@@ -22,9 +23,14 @@
       ...
     }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = nixpkgs.lib.platforms.all;
+      systems = [
+        "aarch64-darwin"
+        "x86_64-darwin"
+        "aarch64-linux" # NOTE: this system is not covered by CI
+        "x86_64-linux"
+      ];
       imports = [
-        flake-gha.flakeModules.default
+        flake-gha.flakeModule
       ];
       perSystem =
         {
@@ -49,5 +55,9 @@
             touch "$out"
           '';
         };
+      githubActions.cachix = {
+        # enable = true;
+        # cacheName = "my-awesome-cache";
+      };
     };
 }
