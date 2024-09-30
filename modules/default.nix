@@ -61,6 +61,7 @@ in
             enable = lib.mkEnableOption "cachix";
             pathsToPush = lib.mkOption {
               type = types.nullOr (types.listOf types.package);
+              default = null;
             };
           };
         };
@@ -81,7 +82,9 @@ in
           double = system;
           os = cfg.platform;
           enableCachix = cfg.cachix.enable;
-          pathsToPush = lib.concatStringsSep " " cfg.cachix.pathsToPush;
+          pathsToPush =
+            if cfg.cachix.pathsToPush == null then "" else lib.concatStringsSep " " cfg.cachix.pathsToPush;
+          skipPush = cfg.cachix.pathsToPush == [ ];
         }) ghaSystems;
       };
   };

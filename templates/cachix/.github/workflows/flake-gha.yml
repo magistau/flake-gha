@@ -35,5 +35,6 @@ jobs:
         name: trieve
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         pathsToPush: ${{ matrix.pathsToPush }}
+        skipPush: ${{ matrix.skipPush }}
     - run: |
         nix build --no-link --print-build-logs .#githubActions.target.${{ matrix.double }}
