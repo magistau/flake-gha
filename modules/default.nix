@@ -58,7 +58,9 @@ in
             default = defaultPlatforms.${system} or null;
           };
           cachix = {
-            enable = lib.mkEnableOption "cachix";
+            enable = lib.mkEnableOption "cachix" // {
+              default = true;
+            };
             pathsToPush = lib.mkOption {
               type = types.nullOr (types.listOf types.package);
               default = null;
@@ -67,6 +69,19 @@ in
         };
       }
     );
+    githubActions = {
+      cachix = {
+        enable = lib.mkEnableOption "cachix";
+        cacheName = lib.mkOption {
+          type = types.str;
+        };
+      };
+      checkAllSystems = lib.mkOption {
+        type = types.bool;
+        default = true;
+        example = false;
+      };
+    };
   };
   config = {
     flake.githubActions =
@@ -75,17 +90,22 @@ in
           (lib.mapAttrs (_: x: x.githubActions))
           (lib.filterAttrs (_: x: x.platform != null))
         ];
+        globalCfg = config.githubActions;
       in
       {
         target = lib.mapAttrs (_: x: lib.recurseIntoAttrs x.checks) ghaSystems;
-        matrix = lib.mapAttrsToList (system: cfg: {
-          double = system;
-          os = cfg.platform;
-          enableCachix = cfg.cachix.enable;
-          pathsToPush =
-            if cfg.cachix.pathsToPush == null then "" else lib.concatStringsSep " " cfg.cachix.pathsToPush;
-          skipPush = cfg.cachix.pathsToPush == [ ];
-        }) ghaSystems;
+        config = {
+          inherit (globalCfg) checkAllSystems;
+          cacheName = lib.optionalString globalCfg.cachix.enable globalCfg.cachix.cacheName;
+          matrix = lib.mapAttrsToList (system: cfg: {
+            double = system;
+            os = cfg.platform;
+            enableCachix = globalCfg.cachix.enable && cfg.cachix.enable;
+            pathsToPush =
+              if cfg.cachix.pathsToPush == null then "" else lib.concatStringsSep " " cfg.cachix.pathsToPush;
+            skipPush = cfg.cachix.pathsToPush == [ ];
+          }) ghaSystems;
+        };
       };
   };
 }

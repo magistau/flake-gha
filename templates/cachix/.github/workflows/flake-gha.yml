@@ -3,28 +3,33 @@ on:
   pull_request:
   push:
 jobs:
-  mkmatrix:
+  config:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.mkmatrix.outputs.matrix }}
+      config: ${{ steps.config.outputs.config }}
     steps:
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v29
-    - id: mkmatrix
-      name: Generate matrix
+    - id: config
+      name: Get config from the flake
       run: |
-        printf 'matrix=' >> "$GITHUB_OUTPUT"
-        nix eval --json .#githubActions.matrix >> "$GITHUB_OUTPUT"
+        printf 'config=' >> "$GITHUB_OUTPUT"
+        nix eval --json .#githubActions.config >> "$GITHUB_OUTPUT"
   check:
+    needs: config
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v29
-    - run: nix check --all-systems --no-build
+    - run: nix flake check --all-systems --no-build
+      if: ${{ fromJSON(needs.config.outputs.config).checkAllSystems }}
+    - run: nix flake check --no-build
+      if: ${{ ! fromJSON(needs.config.outputs.config).checkAllSystems }}
   build:
+    needs: config
     strategy:
       matrix:
-        include: ${{ fromJSON(needs.mkmatrix.outputs.matrix) }}
+        include: ${{ fromJSON(needs.config.outputs.config).matrix }}
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -32,9 +37,9 @@ jobs:
     - uses: cachix/cachix-action@v15
       if: ${{ matrix.enableCachix }}
       with:
-        name: trieve
+        name: ${{ fromJSON(needs.config.outputs.config).cacheName }}
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         pathsToPush: ${{ matrix.pathsToPush }}
         skipPush: ${{ matrix.skipPush }}
     - run: |
-        nix build --no-link --print-build-logs .#githubActions.target.${{ matrix.double }}
+        nix-build --no-link --keep-going --expr '{ system }: (builtins.getFlake (toString ./.)).githubActions.target.${system}' --argstr system ${{ matrix.double }}
