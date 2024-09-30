@@ -1,0 +1,39 @@
+name: "Flake-managed workflow"
+on:
+  pull_request:
+  push:
+jobs:
+  mkmatrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.mkmatrix.outputs.matrix }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v29
+    - id: mkmatrix
+      name: Generate matrix
+      run: |
+        printf 'matrix=' >> "$GITHUB_OUTPUT"
+        nix eval --json .#githubActions.matrix >> "$GITHUB_OUTPUT"
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v29
+    - run: nix check --all-systems --no-build
+  build:
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.mkmatrix.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v29
+    - uses: cachix/cachix-action@v15
+      if: ${{ matrix.enableCachix }}
+      with:
+        name: trieve
+        authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        pathsToPush: ${{ matrix.pathsToPush }}
+    - run: |
+        nix build --no-link --print-build-logs .#githubActions.target.${{ matrix.double }}
