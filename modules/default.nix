@@ -28,7 +28,7 @@ let
   configurations = pkgPath: lib.mapAttrs (_: lib.getAttrFromPath pkgPath);
   perSystemConfigurations = pipe' [
     lib.attrsToList
-    (lib.groupBy (x: x.pkgs.stdenv.buildPlatform.system))
+    (lib.groupBy (x: x.value.pkgs.stdenv.buildPlatform.system))
     (lib.mapAttrs (_: lib.listToAttrs))
   ];
 in
