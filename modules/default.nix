@@ -79,6 +79,10 @@ in
           type = types.str;
           default = null;
         };
+        extraCaches = lib.mkOption {
+          type = types.listOf types.str;
+          default = [ ];
+        };
       };
       checkAllSystems = lib.mkOption {
         type = types.bool;
@@ -102,6 +106,7 @@ in
           inherit (globalCfg) checkAllSystems;
           cacheName = lib.optionalString globalCfg.cachix.enable globalCfg.cachix.cacheName;
           pushFilter = lib.optionalString (globalCfg.cachix.pushFilter != null) globalCfg.cachix.pushFilter;
+          extraPullNames = lib.concatStringsSep "," globalCfg.cachix.extraCaches;
           matrix = lib.mapAttrsToList (system: cfg: {
             double = system;
             os = cfg.platform;
