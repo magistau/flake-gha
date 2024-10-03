@@ -41,5 +41,7 @@ jobs:
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         pathsToPush: ${{ matrix.pathsToPush }}
         skipPush: ${{ matrix.skipPush }}
+        pushFilter: ${{ fromJSON(needs.config.outputs.config).pushFilter }}
+        extraPullNames: ${{ fromJSON(needs.config.outputs.config).extraPullNames }}
     - run: |
         nix-build --no-link --keep-going --expr '{ system }: (builtins.getFlake (toString ./.)).githubActions.target.${system}' --argstr system ${{ matrix.double }}
