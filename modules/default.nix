@@ -9,8 +9,9 @@ let
   inherit (lib) types;
   pipe' = lib.flip lib.pipe;
   defaultPlatforms = {
-    aarch64-darwin = "macos-14";
+    aarch64-darwin = "macos-15";
     x86_64-darwin = "macos-13";
+    aarch64-multiplatform = "ubuntu-24.04-arm";
     x86_64-linux = "ubuntu-24.04";
   };
   flattenAttrs =

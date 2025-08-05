@@ -41,7 +41,7 @@
                 - `homeConfigurations.<name>`
 
                 This can be overriden by changing `perSystem.githubActions.checks` attribute.
-              - By default, only `aarch64-darwin`, `x86_64-darwin` and `x86_64-linux` are available (using `macos-14`, `macos-13` and `ubuntu-24.04` GitHub runners respectively), but you can override this by setting `perSystem.githubActions.platform` to the desired `runs-on` setting.
+              - By default, only `aarch64-darwin`, `x86_64-darwin`, `aarch64-linux` and `x86_64-linux` are available (using `macos-15`, `macos-13`, `ubuntu-24.04-arm` and `ubuntu-24.04` GitHub runners respectively), but you can override this by setting `perSystem.githubActions.platform` to the desired `runs-on` setting.
 
               ### Cachix
               - Add a repository secret named `CACHIX_AUTH_TOKEN` in https://github.com/_<owner>_/_<repo>_/settings/secrets/actions and set it to the Cachix auth token from https://app.cachix.org/cache/_<name>_/settings/authtokens.
