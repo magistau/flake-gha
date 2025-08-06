@@ -30,18 +30,13 @@ jobs:
     strategy:
       matrix:
         include: ${{ fromJSON(needs.config.outputs.config).matrix }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.platform }}
     steps:
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v29
-    - uses: cachix/cachix-action@v15
-      if: ${{ matrix.enableCachix }}
-      with:
-        name: ${{ fromJSON(needs.config.outputs.config).cacheName }}
-        authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        pathsToPush: ${{ matrix.pathsToPush }}
-        skipPush: ${{ matrix.skipPush }}
-        pushFilter: ${{ fromJSON(needs.config.outputs.config).pushFilter }}
-        extraPullNames: ${{ fromJSON(needs.config.outputs.config).extraPullNames }}
     - run: |
-        nix-build --no-link --keep-going --expr '{ system }: (builtins.getFlake (toString ./.)).githubActions.target.${system}' --argstr system ${{ matrix.double }}
+        nix-build --expr '{ system }: (builtins.getFlake (toString ./.)).githubActions.target.${system}.run' --argstr system "$SYSTEM"
+        exec ./result/bin/gha-run
+      env:
+        SYSTEM: ${{ matrix.double }}
+        CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}

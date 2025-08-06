@@ -1,7 +1,7 @@
 {
   description = "A simple flake using GitHub Actions and Cachix";
   inputs = {
-    # NOTE: You may want to add a nixpkgs input instead of relying on the registry
+    nixpkgs = {};
     flake-parts = {
       type = "github";
       owner = "hercules-ci";
@@ -9,7 +9,7 @@
     };
     flake-gha = {
       type = "github";
-      owner = "thecaralice";
+      owner = "magistau";
       repo = "flake-gha";
       inputs.flake-parts.follows = "flake-parts";
     };
@@ -56,8 +56,7 @@
           '';
         };
       githubActions.cachix = {
-        # enable = true;
-        # cacheName = "my-awesome-cache";
+        # cache = "my-awesome-cache";
       };
     };
 }

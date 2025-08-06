@@ -11,7 +11,7 @@ let
   defaultPlatforms = {
     aarch64-darwin = "macos-15";
     x86_64-darwin = "macos-13";
-    aarch64-multiplatform = "ubuntu-24.04-arm";
+    aarch64-linux = "ubuntu-24.04-arm";
     x86_64-linux = "ubuntu-24.04";
   };
   flattenAttrs =
@@ -32,39 +32,89 @@ let
     (lib.groupBy (x: x.value.pkgs.stdenv.buildPlatform.system))
     (lib.mapAttrs (_: lib.listToAttrs))
   ];
+  globalCfg = config.githubActions;
 in
 {
   options = {
     perSystem = flake-parts-lib.mkPerSystemOption (
-      { self', system, ... }:
+      {
+        self',
+        system,
+        pkgs,
+        config,
+        ...
+      }:
+      let
+        cfg = config.githubActions;
+      in
       {
         options.githubActions = {
           checks = lib.mkOption {
             type = types.lazyAttrsOf types.package;
-            default =
-              flattenAttrs (fst: snd: "${fst}-${snd}") (
-                {
-                  inherit (self') checks packages devShells;
-                }
-                // lib.mapAttrs (pipe' [
-                  (x: self."${x}Configurations" or { })
-                  perSystemConfigurations
-                  (lib.attrByPath [ system ] { })
-                  (lib.flip configurations)
-                ]) configurationPaths
-              );
+            default = flattenAttrs (fst: snd: "${fst}-${snd}") (
+              {
+                inherit (self') checks packages devShells;
+              }
+              // lib.mapAttrs (pipe' [
+                (x: self."${x}Configurations" or { })
+                perSystemConfigurations
+                (lib.attrByPath [ system ] { })
+                (lib.flip configurations)
+              ]) configurationPaths
+            );
           };
           platform = lib.mkOption {
             type = types.nullOr types.str;
             default = defaultPlatforms.${system} or null;
           };
           cachix = {
-            enable = lib.mkEnableOption "cachix" // {
-              default = true;
+            package = lib.mkPackageOption pkgs "cachix" { };
+            paths = lib.mkOption {
+              type = types.listOf types.package;
             };
-            pathsToPush = lib.mkOption {
-              type = types.nullOr (types.listOf types.package);
-              default = null;
+            start = lib.mkOption {
+              type = types.package;
+              readOnly = true;
+              visible = false;
+              default = pkgs.writeShellApplication {
+                name = "gha-cachix-start";
+                runtimeInputs = [ cfg.cachix.package ];
+                text = ''
+                  for cache in ${lib.escapeShellArgs globalCfg.cachix.pull-caches}; do
+                    cachix -v use "$cache"
+                  done
+                '';
+              };
+            };
+            end = lib.mkOption {
+              type = types.package;
+              readOnly = true;
+              visible = false;
+              default = pkgs.writeShellApplication {
+                name = "gha-cachix-end";
+                runtimeInputs = [ cfg.cachix.package ];
+                text = lib.optionalString (globalCfg.cachix.push-cache != null) ''
+                  cachix -v push ${lib.escapeShellArg globalCfg.cachix.cache} \
+                    ${lib.escapeShellArgs cfg.cachix.paths}
+                '';
+              };
+            };
+          };
+          run = lib.mkOption {
+            type = types.package;
+            readOnly = true;
+            visible = false;
+            default = pkgs.writeShellApplication {
+              name = "gha-run";
+              runtimeInputs = with cfg.cachix; [
+                start
+                end
+              ];
+              text = ''
+                gha-cachix-start
+                nix-build --no-out-link --keep-going --expr '{ system }: (builtins.getFlake (toString ./.)).githubActions.target.${system}.checks' --argstr system ${lib.escapeShellArg system}
+                gha-cachix-end
+              '';
             };
           };
         };
@@ -72,15 +122,11 @@ in
     );
     githubActions = {
       cachix = {
-        enable = lib.mkEnableOption "cachix";
-        cacheName = lib.mkOption {
-          type = types.str;
-        };
-        pushFilter = lib.mkOption {
+        push-cache = lib.mkOption {
           type = types.nullOr types.str;
           default = null;
         };
-        extraCaches = lib.mkOption {
+        pull-caches = lib.mkOption {
           type = types.listOf types.str;
           default = [ ];
         };
@@ -99,23 +145,21 @@ in
           (lib.mapAttrs (_: x: x.githubActions))
           (lib.filterAttrs (_: x: x.platform != null))
         ];
-        globalCfg = config.githubActions;
       in
       {
-        target = lib.mapAttrs (_: x: lib.recurseIntoAttrs x.checks) ghaSystems;
+        target = lib.mapAttrs (_: x: {
+          inherit (x) run;
+          checks = lib.recurseIntoAttrs x.checks;
+        }) ghaSystems;
         config = {
           inherit (globalCfg) checkAllSystems;
-          cacheName = lib.optionalString globalCfg.cachix.enable globalCfg.cachix.cacheName;
-          pushFilter = lib.optionalString (globalCfg.cachix.pushFilter != null) globalCfg.cachix.pushFilter;
-          extraPullNames = lib.concatStringsSep "," globalCfg.cachix.extraCaches;
-          matrix = lib.mapAttrsToList (system: cfg: {
-            double = system;
-            os = cfg.platform;
-            enableCachix = globalCfg.cachix.enable && cfg.cachix.enable;
-            pathsToPush =
-              if cfg.cachix.pathsToPush == null then "" else lib.concatStringsSep " " cfg.cachix.pathsToPush;
-            skipPush = cfg.cachix.pathsToPush == [ ];
-          }) ghaSystems;
+          matrix = lib.mapAttrsToList (
+            double:
+            { platform, ... }:
+            {
+              inherit double platform;
+            }
+          ) ghaSystems;
         };
       };
   };

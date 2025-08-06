@@ -44,9 +44,13 @@
               - By default, only `aarch64-darwin`, `x86_64-darwin`, `aarch64-linux` and `x86_64-linux` are available (using `macos-15`, `macos-13`, `ubuntu-24.04-arm` and `ubuntu-24.04` GitHub runners respectively), but you can override this by setting `perSystem.githubActions.platform` to the desired `runs-on` setting.
 
               ### Cachix
+              #### Pull
+              List the caches you want to pull from in `githubActions.cachix.pull-caches`
+
+              #### Push
               - Add a repository secret named `CACHIX_AUTH_TOKEN` in https://github.com/_<owner>_/_<repo>_/settings/secrets/actions and set it to the Cachix auth token from https://app.cachix.org/cache/_<name>_/settings/authtokens.
-              - Set `githubActions.cachix.enable` to `true` and `githubActions.cachix.cacheName` to the name of your cache.
-              - If you want to disable Cachix for a specific system, set `perSystem.githubActions.cachix.enable` to `false`.
+              - Set `githubActions.cachix.push-cache` to the name of your cache.
+              - List the paths you want to push in `perSystem.githubActions.cachix.paths`
             '';
           };
         };
