@@ -33,6 +33,16 @@ let
     (lib.mapAttrs (_: lib.listToAttrs))
   ];
   globalCfg = config.githubActions;
+  flake-out-attr = pipe' [
+    (map (
+      lib.escape [
+        ''\''
+        ''"''
+      ]
+    ))
+    (map (x: ''."${x}"''))
+    lib.concatStrings
+  ];
 in
 {
   options = {
@@ -94,11 +104,34 @@ in
                 name = "gha-cachix-end";
                 runtimeInputs = [ cfg.cachix.package ];
                 text = lib.optionalString (globalCfg.cachix.push-cache != null) ''
-                  cachix -v push ${lib.escapeShellArg globalCfg.cachix.cache} \
-                    ${lib.escapeShellArgs cfg.cachix.paths}
+                  nix build -L --keep-going .#${
+                    lib.escapeShellArg (flake-out-attr [
+                      "githubActions"
+                      "target"
+                      system
+                      "pushTarget"
+                    ])
+                  }
+                  find ./result/ -print -exec cachix -v push ${lib.escapeShellArg globalCfg.cachix.cache} {} +
                 '';
               };
             };
+            pushTarget = lib.mkOption {
+              type = types.package;
+              readOnly = true;
+              visible = false;
+              default = lib.pipe cfg.cachix.paths [
+                (lib.imap0 lib.nameValuePair)
+                (lib.mapAttrs (_: toString))
+                builtins.listToAttrs
+              ];
+            };
+          };
+          buildTarget = lib.mkOption {
+            type = types.package;
+            readOnly = true;
+            visible = false;
+            default = pkgs.linkFarm "gha-build" cfg.checks;
           };
           run = lib.mkOption {
             type = types.package;
@@ -112,7 +145,14 @@ in
               ];
               text = ''
                 gha-cachix-start
-                nix-build --no-out-link --keep-going --expr '{ system }: (builtins.getFlake (toString ./.)).githubActions.target.${system}.checks' --argstr system ${lib.escapeShellArg system}
+                nix build -L --keep-going --no-out-link .#${
+                  lib.escapeShellArg (flake-out-attr [
+                    "githubActions"
+                    "target"
+                    system
+                    "buildTarget"
+                  ])
+                }
                 gha-cachix-end
               '';
             };
@@ -148,8 +188,8 @@ in
       in
       {
         target = lib.mapAttrs (_: x: {
-          inherit (x) run;
-          checks = lib.recurseIntoAttrs x.checks;
+          inherit (x) run buildTarget;
+          inherit (x.cachix) pushTarget;
         }) ghaSystems;
         config = {
           inherit (globalCfg) checkAllSystems;
@@ -157,7 +197,13 @@ in
             double:
             { platform, ... }:
             {
-              inherit double platform;
+              inherit platform;
+              run = flake-out-attr [
+                "githubActions"
+                "target"
+                double
+                "run"
+              ];
             }
           ) ghaSystems;
         };

@@ -14,7 +14,7 @@ jobs:
       name: Get config from the flake
       run: |
         printf 'config=' >> "$GITHUB_OUTPUT"
-        nix eval --json .#githubActions.config >> "$GITHUB_OUTPUT"
+        nix eval --json .#.githubActions.config >> "$GITHUB_OUTPUT"
   check:
     needs: config
     runs-on: ubuntu-latest
@@ -35,8 +35,8 @@ jobs:
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v29
     - run: |
-        nix-build --expr '{ system }: (builtins.getFlake (toString ./.)).githubActions.target.${system}.run' --argstr system "$SYSTEM"
+        nix build -L .#"$RUNNER_ATTR"
         exec ./result/bin/gha-run
       env:
-        SYSTEM: ${{ matrix.double }}
+        RUNNER_ATTR: ${{ matrix.run }}
         CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
